@@ -62,7 +62,10 @@ func (c *Cache) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) 
 	w.WriteMsg(resp)
 
 	if c.shouldPrefetch(i, now) {
-		go c.doPrefetch(ctx, state, server, i, now)
+		// deep copy request before prefetching to prevent possible race conditions
+		stateCopy := state
+		stateCopy.Req = stateCopy.Req.Copy()
+		go c.doPrefetch(ctx, stateCopy, server, i, now)
 	}
 	return dns.RcodeSuccess, nil
 }
