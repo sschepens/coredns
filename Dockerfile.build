@@ -1,21 +1,24 @@
-FROM golang:1.15 as builder
+FROM golang:1.15
+
+RUN apt-get update && apt-get -uy upgrade
+RUN apt-get -y install ca-certificates bzip2 && \
+    update-ca-certificates && \
+    wget http://upx.sourceforge.net/download/upx-3.91-amd64_linux.tar.bz2 && \
+    tar -xjf upx-3.91-amd64_linux.tar.bz2 && \
+    mv upx-3.91-amd64_linux/upx /bin/upx
 
 RUN mkdir /build
 COPY . /build/
 WORKDIR /build
 RUN go generate
-RUN go build -ldflags="-s -w -X github.com/coredns/coredns/coremain.GitCommit=96f53c92ccede2cd1d906821cd8d228218d426df" .
-RUN ls -lah .
-
-FROM debian:stable-slim as certificates
-
-RUN apt-get update && apt-get -uy upgrade
-RUN apt-get -y install ca-certificates && update-ca-certificates
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/coredns/coredns/coremain.GitCommit=c321905f7e82c0cb984082cc8208e21d26e91d4b" .
+RUN upx --force /build/coredns
+RUN ls -lah /build/coredns
 
 FROM scratch
 
-COPY --from=builder /build/coredns /coredns
-COPY --from=certificates /etc/ssl/certs /etc/ssl/certs
+COPY --from=0 /build/coredns /coredns
+COPY --from=0 /etc/ssl/certs /etc/ssl/certs
 
 EXPOSE 53 53/udp
 ENTRYPOINT ["/coredns"]
